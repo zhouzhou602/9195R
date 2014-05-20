@@ -1,0 +1,115 @@
+#Small improvement based on Mac is made.
+##Only use library(plyr) shows error in my Mac
+##So I replace it to install.packages and get the released version.
+##In Mac, it may appear"tar: Failed to set default locale" while installing the package
+##This error can be solved by writing the following in terminal: defaults write org.R-project.R force.LANG en_US.UTF-8
+##And restart R
+
+# Note: you only have to install.packages("plyr"), etc once (or at
+# least once per R update).
+
+library(plyr)
+
+#Set basic function for data
+downloadFERCdata1995 <- function(base.url="http://www.ferc.gov/docs-filing/forms/form-2/data",
+                          years=1991:1995,
+                          out.dir="./fercForm2Data2") {
+   dir.create(out.dir)
+   for(y in years) {
+     for(letters in c("A-M","N-Z")) {
+       name <- sprintf("F2Y%d%s.zip",y-1900,letters)
+       file.name <- paste(out.dir,name,sep="/")
+       if (file.exists(file.name)) {
+         warning(sprintf("%s already exists, not redownloading\n",file.name))
+         return
+       } else {
+         url <- paste(base.url,y,name,sep="/")
+         download.file(url,file.name,mode="wb")
+       }
+     }
+   }
+ }
+
+
+# Find a single record from a .dat file that has been read into the
+# character vector "lines"
+extractRecord <-  function(lines,schedule,record,column,
+                           sequence=NA,balance.year=1,
+                           utility.plant=NULL) {
+  if (is.na(sequence)) {
+    pattern <- sprintf("%s0{0,1}%d\\d{6}%d", schedule, record,
+                         balance.year)
+  } else {
+    pattern <- sprintf("%s0{0,1}%d0+%d%d", schedule, record,
+                       sequence,
+                       balance.year)
+  }
+  if (!is.null(utility.plant) && !is.na(utility.plant)) {
+    pattern <- sprintf("%s%d",pattern,utility.plant)
+    }
+  line.number <- grep(pattern=pattern,x=lines)
+  if (length(line.number)==0) {
+    warning(sprintf("Failed to find line matching %s\n",pattern))
+    return(NA)
+  }
+  if (length(line.number)>1) {
+    warning(sprintf("Found %d lines matching %s, using last one\n",length(line.number),pattern))
+    }
+  return(as.numeric(strsplit(lines[line.number],split=" +")[[1]][column]))
+}
+
+
+loadVariables <- function(years=1991:1995,
+                          base.dir=".", tmp.dir=tempdir(),
+                          var.key)
+  # var.key should be a data frame with columns "schedule",
+  # "record", "sequence.number", "balance.year", "column", "name"
+{
+  appendedData <- NULL;
+  dir.create(tmp.dir)
+  for (year in years) {
+    for(letters in c("A-M","N-Z")) {
+      zip.name <-
+        sprintf("%s/F2Y%d%s.zip",base.dir,year-1900,letters)
+      zl <- unzip(zip.name,list=TRUE)$Name
+      unzip(zip.name,exdir=tmp.dir)
+      for (fname in zl) {
+        dat.file <- paste(tmp.dir,fname,sep="/")
+
+        lines <- readLines(dat.file)
+        co.data <-
+          data.frame(respondent_name=substr(lines[1],17,17+44),report_yr=year,
+                     id=substr(lines[1],13,16))
+        for(r in 1:nrow(var.key)) {
+          co.data[,var.key[r,"name"]] <- extractRecord(lines,
+                                                       schedule=var.key[r,"schedule"],
+                                                       record=var.key[r,"record"],
+                                                       column=var.key[r,"column"],
+                                                        sequence=var.key[r,"sequence.number"],
+                                                       balance.year=var.key[r,"balance.year"],
+                                                       utility.plant=var.key[r,"utility.plant"])
+
+        }
+        if (is.null(appendedData)) {
+          appendedData <- co.data
+        }
+        else {
+          appendedData <- rbind.fill(appendedData,
+                                     co.data)
+        }
+        unlink(dat.file)
+        print(paste("Finished",fname,year))
+      }
+    }
+  }
+  return(appendedData)
+}
+
+var.key <- read.csv("key9195.csv",stringsAsFactors=FALSE)
+
+
+#Download 1991-1995 data from website
+downloadFERCdata1995()
+
+# load data into R
+data9195 <- loadVariables(years=1991:1995,var.key=var.key,base.dir="fercForm2Data2")
