@@ -33,9 +33,12 @@ downloadFERCdata1995 <- function(base.url="http://www.ferc.gov/docs-filing/forms
 
 # Find a single record from a .dat file that has been read into the
 # character vector "lines"
+# add new arguments for "revenue.type" and "line.number"
 extractRecord <-  function(lines,schedule,record,column,
                            sequence=NA,balance.year=1,
-                           utility.plant=NULL) {
+                           utility.plant=NULL,
+                           line.number=NULL,
+                           revenue.type=NULL) {
   if (is.na(sequence)) {
     pattern <- sprintf("%s0{0,1}%d\\d{6}%d", schedule, record,
                          balance.year)
