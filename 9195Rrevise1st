@@ -33,12 +33,11 @@ downloadFERCdata1995 <- function(base.url="http://www.ferc.gov/docs-filing/forms
 
 # Find a single record from a .dat file that has been read into the
 # character vector "lines"
-# add new arguments for "revenue.type" and "line.number"
+# Add arguments for "line.no" and "revenue.type"
 extractRecord <-  function(lines,schedule,record,column,
                            sequence=NA,balance.year=1,
-                           utility.plant=NULL,
-                           line.number=NULL,
-                           revenue.type=NULL) {
+                           utility.plant=NULL,line.no=NULL
+						   ,revenue.type=NULL) {
   if (is.na(sequence)) {
     pattern <- sprintf("%s0{0,1}%d\\d{6}%d", schedule, record,
                          balance.year)
@@ -47,6 +46,30 @@ extractRecord <-  function(lines,schedule,record,column,
                        sequence,
                        balance.year)
   }
+  if (!is.null(line.no) && !is.na(line.no)) {
+    pattern <- sprintf("%s%d",pattern,line.no)
+	}
+  line.number <- grep(pattern=pattern,x=lines)
+  if (length(line.number)==0) {
+    warning(sprintf("Falied to find line matching %s\n",pattern))
+	return(NA)
+  }
+  if (length(line.number)>1) {
+    warning(sprintf("Found %d lines matching %s, using last one\n",length(line.number),pattern))
+	}
+  return(as.numeric(strsplit(lines[line.number],split=" +")[[1]][column]))
+  if (!is.null(revenue.type) && !is.na(revenue.type)) {
+    pattern <- sprintf("%s%d",pattern,revenue.type)
+	}
+  line.number <- grep(pattern=pattern,x=lines)
+  if (length(line.number)==0) {
+    warning(sprintf("Failed to find line matching %s\n",pattern))
+	return(NA)
+  }
+  if (length(line.number)>1) {
+    warning(sprintf("Found %d lines matching %s, using last one\n",length(line.number),pattern))
+    }
+  return(as.numeric(strsplit(lines[line.number],split=" +")[[1]][column]))
   if (!is.null(utility.plant) && !is.na(utility.plant)) {
     pattern <- sprintf("%s%d",pattern,utility.plant)
     }
@@ -67,6 +90,7 @@ loadVariables <- function(years=1991:1995,
                           var.key)
   # var.key should be a data frame with columns "schedule",
   # "record", "sequence.number", "balance.year", "column", "name"
+  # should add columns for "line.no" and "revenue.type"
 {
   appendedData <- NULL;
   dir.create(tmp.dir)
@@ -90,7 +114,9 @@ loadVariables <- function(years=1991:1995,
                                                        column=var.key[r,"column"],
                                                         sequence=var.key[r,"sequence.number"],
                                                        balance.year=var.key[r,"balance.year"],
-                                                       utility.plant=var.key[r,"utility.plant"])
+                                                       utility.plant=var.key[r,"utility.plant"],
+                                                       line.no=var.key[r,"line.no"],
+                                                       revenue.type=var.key[r,"revenue.type"])
 
         }
         if (is.null(appendedData)) {
